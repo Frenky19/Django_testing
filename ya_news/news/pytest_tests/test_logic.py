@@ -1,12 +1,10 @@
-import pytest
 from http import HTTPStatus
-from django.contrib.auth import get_user_model
+
+import pytest
 from django.urls import reverse
-from news.models import Comment
+
 from news.forms import BAD_WORDS, WARNING
-
-
-User = get_user_model()
+from news.models import Comment
 
 
 @pytest.mark.django_db

@@ -5,10 +5,12 @@ from django.urls import reverse
 from notes.forms import NoteForm
 from notes.models import Note
 
+
 User = get_user_model()
 
 
-class ContentTestCase(TestCase):
+class BaseTestCase(TestCase):
+    """Базовый тестовый класс, используемый другими классами"""
 
     @classmethod
     def setUpTestData(cls):
@@ -27,6 +29,14 @@ class ContentTestCase(TestCase):
         # Авторизуем клиента как не автора
         cls.not_author_client = Client()
         cls.not_author_client.force_login(cls.not_author)
+        # Используемые маршруты
+        cls.notes_url = reverse('notes:list')
+        cls.note_add_url = reverse('notes:add')
+        cls.note_edit_url = reverse('notes:edit', args=(cls.note.slug,))
+
+
+class ContentTests(BaseTestCase):
+    """Класс, тестирующий контент приложения"""
 
     def test_note_in_context_object_list(self):
         """
@@ -34,38 +44,37 @@ class ContentTestCase(TestCase):
 
         Также список заметок доступен автору
         """
-        url = reverse('notes:list')
         # Автор запрашивает список заметок.
-        response = self.author_client.get(url)
-        object_list = response.context['object_list']
+        response = self.author_client.get(self.notes_url)
+        notes = response.context['object_list']
         # Проверяем, что заметка присутствует в object_list.
-        self.assertIn(self.note, object_list)
+        self.assertIn(self.note, notes)
 
     def test_note_not_in_list_for_another_user(self):
         """Список заметок не доступен другому пользователю"""
-        url = reverse('notes:list')
         # Не автор запрашивает список заметок.
-        response = self.not_author_client.get(url)
-        object_list = response.context['object_list']
+        response = self.not_author_client.get(self.notes_url)
+        notes = response.context['object_list']
         # Проверяем, что заметка не видна другому пользователю.
-        self.assertNotIn(self.note, object_list)
+        self.assertNotIn(self.note, notes)
 
-    def test_create_note_page_contains_form(self):
-        """Страница создания заметки содержит корректную форму"""
-        url = reverse('notes:add')
-        # Автор запрашивает страницу создания заметки.
-        response = self.author_client.get(url)
-        # Проверяем, есть ли объект формы в контексте.
-        self.assertIn('form', response.context)
-        # Проверяем, что форма принадлежит нужному классу.
-        self.assertIsInstance(response.context['form'], NoteForm)
-
-    def test_edit_note_page_contains_form(self):
-        """Страница редактирования заметки содержит корректную форму"""
-        url = reverse('notes:edit', args=(self.note.slug,))
-        # Автор запрашивает страницу редактирования заметки.
-        response = self.author_client.get(url)
-        # Проверяем, есть ли объект формы в контексте.
-        self.assertIn('form', response.context)
-        # Проверяем, что форма принадлежит нужному классу.
-        self.assertIsInstance(response.context['form'], NoteForm)
+    def test_note_pages_contain_correct_form(self):
+        """Страницы создания и редактирования содержат корректные формы"""
+        pages = [
+            {
+                'url': self.note_add_url,
+                'name': 'создание заметки',
+            },
+            {
+                'url': self.note_edit_url,
+                'name': 'редактирование заметки',
+            },
+        ]
+        for page in pages:
+            with self.subTest(page=page['name']):
+                # Автор запрашивает страницу.
+                response = self.author_client.get(page['url'])
+                # Проверяем, есть ли объект формы в контексте.
+                self.assertIn('form', response.context)
+                # Проверяем, что форма принадлежит нужному классу.
+                self.assertIsInstance(response.context['form'], NoteForm)

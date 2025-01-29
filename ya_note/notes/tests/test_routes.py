@@ -6,10 +6,12 @@ from django.urls import reverse
 
 from notes.models import Note
 
+
 User = get_user_model()
 
 
-class RoutesTestCase(TestCase):
+class BaseTestCase(TestCase):
+    """Базовый тестовый класс, используемый другими классами"""
 
     @classmethod
     def setUpTestData(cls):
@@ -29,27 +31,44 @@ class RoutesTestCase(TestCase):
         # Авторизуем клиента как не автора
         cls.not_author_client = Client()
         cls.not_author_client.force_login(cls.not_author)
-        # Клиент без авторизации
-        cls.anonymous_client = Client()
+        # Используемые маршруты для анонимного клиента:
+        cls.pages_for_anonymous = [
+            'notes:home', 'users:login', 'users:logout', 'users:signup'
+        ]
+        # Для авторизированного клиента (не автора):
+        cls.pages_for_not_author = ['notes:list', 'notes:add', 'notes:success']
+        # Для автора заметки:
+        cls.pages_for_author = ['notes:detail', 'notes:edit', 'notes:delete']
+        # Страницы для редиректа анонимного клиента:
+        cls.pages_with_redirect_for_anonymous = {
+            'notes:detail': (cls.note.slug,),
+            'notes:edit': (cls.note.slug,),
+            'notes:delete': (cls.note.slug,),
+            'notes:add': None,
+            'notes:success': None,
+            'notes:list': None,
+        }
+        # Редирект на страницу логина:
+        cls.login_url = reverse('users:login')
+
+
+class RoutesTests(BaseTestCase):
+    """Класс, тестирующий маршруты приложения"""
 
     def test_pages_availability_for_anonymous_user(self):
         """Страницы доступны анонимному пользователю."""
-        # Публичные страницы
-        pages = ['notes:home', 'users:login', 'users:logout', 'users:signup']
-        for page in pages:
+        for page in self.pages_for_anonymous:
             # Проверяем каждую страницу
             with self.subTest(page=page):
                 url = reverse(page)
                 # GET-запрос анонимным пользователем
-                response = self.anonymous_client.get(url)
+                response = self.client.get(url)
                 # Проверяем, что статус 200
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    def test_pages_availability_for_auth_user(self):
+    def test_pages_availability_for_not_author_user(self):
         """Страницы доступны авторизованному пользователю."""
-        # Страницы только для авторизованных пользователей
-        pages = ['notes:list', 'notes:add', 'notes:success']
-        for page in pages:
+        for page in self.pages_for_not_author:
             # Проверяем каждую страницу
             with self.subTest(page=page):
                 url = reverse(page)
@@ -69,10 +88,8 @@ class RoutesTestCase(TestCase):
             # Автор должен получать доступ
             (self.author_client, HTTPStatus.OK)
         ]
-        # Проверяемые страницы
-        pages = ['notes:detail', 'notes:edit', 'notes:delete']
         for client, expected_status in users_statuses:
-            for page in pages:
+            for page in self.pages_for_author:
                 # Проверяем каждое сочетание
                 with self.subTest(client=client, page=page):
                     url = reverse(page, args=(self.note.slug,))
@@ -88,23 +105,14 @@ class RoutesTestCase(TestCase):
         Анонимный пользователь перенаправляется на страницу логина
         со всех страниц, требующих авторизации.
         """
-        login_url = reverse('users:login')
         # Страницы, требующие авторизации
-        pages = {
-            'notes:detail': (self.note.slug,),
-            'notes:edit': (self.note.slug,),
-            'notes:delete': (self.note.slug,),
-            'notes:add': None,
-            'notes:success': None,
-            'notes:list': None,
-        }
-        for page, args in pages.items():
+        for page, args in self.pages_with_redirect_for_anonymous.items():
             # Проверяем каждую страницу
             with self.subTest(page=page):
                 url = reverse(page, args=args)
                 # Ожидаемый редирект на страницу логина с next
-                expected_url = f'{login_url}?next={url}'
+                expected_url = f'{self.login_url}?next={url}'
                 # GET-запрос от анонимного пользователя
-                response = self.anonymous_client.get(url)
+                response = self.client.get(url)
                 # Проверяем редирект к странице логина
                 self.assertRedirects(response, expected_url)
