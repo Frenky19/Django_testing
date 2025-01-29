@@ -3,7 +3,7 @@ from django.conf import settings
 from django.urls import reverse
 
 from news.forms import CommentForm
-
+from .utils import today, tomorrow, yesterday
 
 @pytest.mark.django_db
 def test_news_count(client, news):

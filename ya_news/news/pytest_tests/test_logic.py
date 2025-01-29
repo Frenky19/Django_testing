@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
-
+from .utils import today, tomorrow, yesterday
 
 @pytest.mark.django_db
 def test_user_can_create_comment(auth_client, news_object):
