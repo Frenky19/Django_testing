@@ -14,7 +14,6 @@ class BaseTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Тестовые данные, которые будут использоваться всеми тестами
         cls.author = User.objects.create_user(username='Автор')
         cls.not_author = User.objects.create_user(username='Не автор')
         cls.note = Note.objects.create(
@@ -23,13 +22,10 @@ class BaseTestCase(TestCase):
             slug='note-slug',
             author=cls.author,
         )
-        # Авторизуем клиента как автора
         cls.author_client = Client()
         cls.author_client.force_login(cls.author)
-        # Авторизуем клиента как не автора
         cls.not_author_client = Client()
         cls.not_author_client.force_login(cls.not_author)
-        # Используемые маршруты
         cls.notes_url = reverse('notes:list')
         cls.note_add_url = reverse('notes:add')
         cls.note_edit_url = reverse('notes:edit', args=(cls.note.slug,))
@@ -44,18 +40,14 @@ class ContentTests(BaseTestCase):
 
         Также список заметок доступен автору
         """
-        # Автор запрашивает список заметок.
         response = self.author_client.get(self.notes_url)
         notes = response.context['object_list']
-        # Проверяем, что заметка присутствует в object_list.
         self.assertIn(self.note, notes)
 
     def test_note_not_in_list_for_another_user(self):
         """Список заметок не доступен другому пользователю"""
-        # Не автор запрашивает список заметок.
         response = self.not_author_client.get(self.notes_url)
         notes = response.context['object_list']
-        # Проверяем, что заметка не видна другому пользователю.
         self.assertNotIn(self.note, notes)
 
     def test_note_pages_contain_correct_form(self):
@@ -72,9 +64,6 @@ class ContentTests(BaseTestCase):
         ]
         for page in pages:
             with self.subTest(page=page['name']):
-                # Автор запрашивает страницу.
                 response = self.author_client.get(page['url'])
-                # Проверяем, есть ли объект формы в контексте.
                 self.assertIn('form', response.context)
-                # Проверяем, что форма принадлежит нужному классу.
                 self.assertIsInstance(response.context['form'], NoteForm)

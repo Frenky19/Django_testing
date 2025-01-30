@@ -1,64 +1,50 @@
 from http import HTTPStatus
 
 import pytest
-from django.urls import reverse
-from .utils import today, tomorrow, yesterday
-
-@pytest.mark.django_db
-def test_pages_availability(client, news_object):
-    """Тест доступности страниц."""
-    # Набор страниц для проверки
-    pages = [
-        ('news:home', None),
-        ('news:detail', (news_object.id,)),
-        ('users:login', None),
-        ('users:logout', None),
-        ('users:signup', None),
-    ]
-
-    for name, args in pages:
-        # Генерация адреса с помощью reverse
-        url = reverse(name, args=args)
-        # Отправка GET-запроса
-        response = client.get(url)
-        # Проверка статуса ответа
-        assert response.status_code == HTTPStatus.OK
 
 
-@pytest.mark.django_db
+pytestmark = pytest.mark.django_db
+
+
 @pytest.mark.parametrize(
-    'user, expected_status',
+    'user, page, expected_status',
     [
-        ('author', HTTPStatus.OK),
-        ('not_author', HTTPStatus.NOT_FOUND),
+        (None, 'home', HTTPStatus.OK),
+        (None, 'detail', HTTPStatus.OK),
+        (None, 'login', HTTPStatus.OK),
+        (None, 'logout', HTTPStatus.OK),
+        (None, 'signup', HTTPStatus.OK),
+        ('author_client', 'edit', HTTPStatus.OK),
+        ('author_client', 'delete', HTTPStatus.OK),
+        ('not_author_client', 'edit', HTTPStatus.NOT_FOUND),
+        ('not_author_client', 'delete', HTTPStatus.NOT_FOUND),
     ],
 )
-def test_availability_for_comment_edit_and_delete(
-    client, user, expected_status, request, comment
+def test_pages_availability(
+    clean_db, urls, request, client, user,
+    page, expected_status, news_object, comment
 ):
-    """Тест доступности страниц редактирования и удаления комментариев."""
-    # Получаем пользователя из фикстуры
-    test_user = request.getfixturevalue(user)
-    # Логиним пользователя
-    client.force_login(test_user)
+    """
+    Тест доступности страниц:
+    - Общих страниц (без авторизации или с авторизацией).
+    - Страниц редактирования и удаления комментариев.
+    """
+    if user is not None:
+        client = request.getfixturevalue(user)
+    if page in ['edit', 'delete']:
+        page_url = urls[page](comment.id)
+    elif page == 'detail':
+        page_url = urls[page](news_object.id)
+    else:
+        page_url = urls[page]
+    response = client.get(page_url)
+    assert response.status_code == expected_status
 
-    # Проверяем доступы для страниц редактирования и удаления комментариев
-    for name in ('news:edit', 'news:delete'):
-        url = reverse(name, args=(comment.id,))
-        response = client.get(url)
-        assert response.status_code == expected_status
 
-
-@pytest.mark.django_db
-def test_redirect_for_anonymous_client(client, comment):
+def test_redirect_for_anonymous_client(clean_db, urls, client, comment):
     """Тест редиректа для анонимных пользователей на страницы авторизации."""
-    login_url = reverse('users:login')
-
-    for name in ('news:edit', 'news:delete'):
-        url = reverse(name, args=(comment.id,))
-        # Ожидаемый редирект с параметром next
-        redirect_url = f'{login_url}?next={url}'
-        response = client.get(url)
-        # Проверка, что редирект ведёт на страницу логина
+    for page in (urls['edit'](comment.id,), urls['delete'](comment.id,)):
+        redirect_url = f'{urls['login']}?next={page}'
+        response = client.get(page)
         assert response.status_code == HTTPStatus.FOUND
         assert response.url == redirect_url

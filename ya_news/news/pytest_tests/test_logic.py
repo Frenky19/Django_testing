@@ -1,98 +1,91 @@
 from http import HTTPStatus
 
 import pytest
-from django.urls import reverse
 
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
-from .utils import today, tomorrow, yesterday
 
-@pytest.mark.django_db
-def test_user_can_create_comment(auth_client, news_object):
-    client, user = auth_client
-    url = reverse('news:detail', args=(news_object.id,))
+
+pytestmark = pytest.mark.django_db
+
+
+def test_user_can_create_comment(
+        clean_db, author_client, urls, news_object, author
+):
+    comment_count_before = Comment.objects.count()
     form_data = {'text': 'Текст комментария'}
-    # Отправляем POST-запрос
-    response = client.post(url, data=form_data)
-    # Проверка редиректа
+    response = author_client.post(
+        urls['detail'](news_object.id), data=form_data
+    )
+    comment_count_after = Comment.objects.count()
+    assert comment_count_after == comment_count_before + 1
     assert response.status_code == HTTPStatus.FOUND
-    assert response.url == f'{url}#comments'
-    # Проверка создания комментария
-    comments_count = Comment.objects.count()
-    assert comments_count == 1
-    # Проверка содержимого комментария
+    assert response.url == f'{urls['detail'](news_object.id)}#comments'
     comment = Comment.objects.get()
-    assert comment.text == 'Текст комментария'
+    assert comment.text == form_data['text']
     assert comment.news == news_object
-    assert comment.author == user
+    assert comment.author == author
 
 
-@pytest.mark.django_db
-def test_user_cant_use_bad_words(auth_client, news_object):
+def test_user_cant_use_bad_words(clean_db, author_client, urls, news_object):
     """Проверяем, что комментарий не содержит 'плохие слова'"""
-    client, _ = auth_client
-    url = reverse('news:detail', args=(news_object.id,))
+    comment_count_before = Comment.objects.count()
     bad_words = {'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'}
-    # Отправляем запрос с использованием плохих слов
-    response = client.post(url, data=bad_words)
-    # Проверяем, что форма вернула соответствующую ошибку
+    response = author_client.post(
+        urls['detail'](news_object.id), data=bad_words
+    )
+    comment_count_after = Comment.objects.count()
+    assert comment_count_after == comment_count_before
     assert 'form' in response.context
     form = response.context['form']
     assert form.errors['text'] == [WARNING]
-    # Проверяем, что комментарий не создан
-    assert Comment.objects.count() == 0
 
 
-@pytest.mark.django_db
-def test_author_can_delete_comment(author, comment, client):
-    client.force_login(author)
-    delete_url = reverse('news:delete', args=(comment.id,))
-    comments_url = (
-        reverse('news:detail', args=(comment.news.id,))
-        + '#comments'
-    )
-    # Удаляем комментарий
-    response = client.post(delete_url)
+def test_author_can_delete_comment(
+        clean_db, author_client, urls, comment
+):
+    comment_count_before = Comment.objects.count()
+    response = author_client.post(urls['delete'](comment.id))
+    comment_count_after = Comment.objects.count()
+    assert comment_count_after == comment_count_before - 1
     assert response.status_code == HTTPStatus.FOUND
-    assert response.url == comments_url
-    # Убедимся, что комментарий удалён
-    assert Comment.objects.count() == 0
+    assert response.url == (urls['detail'](comment.news.id) + '#comments')
 
 
-@pytest.mark.django_db
-def test_user_cant_delete_comment_of_another_user(not_author_client, comment):
-    delete_url = reverse('news:delete', args=(comment.id,))
-    # Пытаемся удалить комментарий от чужого лица
-    response = not_author_client.post(delete_url)
+def test_user_cant_delete_comment_of_another_user(
+        clean_db, not_author_client, urls, comment
+):
+    comment_count_before = Comment.objects.count()
+    response = not_author_client.post(urls['delete'](comment.id))
+    comment_count_after = Comment.objects.count()
+    assert comment_count_after == comment_count_before
     assert response.status_code == HTTPStatus.NOT_FOUND
-    # Убедимся, что комментарий остался
-    assert Comment.objects.count() == 1
 
 
-@pytest.mark.django_db
-def test_author_can_edit_comment(author, comment, client):
-    client.force_login(author)
-    edit_url = reverse('news:edit', args=(comment.id,))
-    comments_url = (
-        reverse('news:detail', args=(comment.news.id,))
-        + '#comments'
+def test_author_can_edit_comment(
+        clean_db, author_client, urls, comment, client
+):
+    new_text = 'Обновлённый комментарий'
+    response = author_client.post(
+        urls['edit'](comment.id), data={'text': new_text}
     )
-    new_text = 'Обновлённый комментарий'
-    response = client.post(edit_url, data={'text': new_text})
     assert response.status_code == HTTPStatus.FOUND
-    assert response.url == comments_url
-    # Проверяем, что текст комментария обновился
-    comment.refresh_from_db()
-    assert comment.text == new_text
+    assert response.url == (urls['detail'](comment.news.id) + '#comments')
+    comment_from_db = Comment.objects.get(id=comment.id)
+    assert comment_from_db.text == new_text
+    assert comment_from_db.author == comment.author
+    assert comment_from_db.news == comment.news
 
 
-@pytest.mark.django_db
-def test_user_cant_edit_comment_of_another_user(not_author_client, comment):
-    edit_url = reverse('news:edit', args=(comment.id,))
-    # Пытаемся отредактировать комментарий от чужого лица
+def test_user_cant_edit_comment_of_another_user(
+        clean_db, urls, not_author_client, comment
+):
     new_text = 'Обновлённый комментарий'
-    response = not_author_client.post(edit_url, data={'text': new_text})
+    response = not_author_client.post(
+        urls['edit'](comment.id), data={'text': new_text}
+    )
     assert response.status_code == HTTPStatus.NOT_FOUND
-    # Убедимся, что текст остался прежним
-    comment.refresh_from_db()
-    assert comment.text == 'Текст комментария'
+    comment_from_db = Comment.objects.get(id=comment.id)
+    assert comment_from_db.text == comment.text
+    assert comment_from_db.author == comment.author
+    assert comment_from_db.news == comment.news

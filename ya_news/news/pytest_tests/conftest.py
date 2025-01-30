@@ -4,13 +4,21 @@ import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.urls import reverse
 from django.utils import timezone
 
-from news.models import News, Comment
+from news.models import Comment, News
 from .utils import today
 
 
 User = get_user_model()
+
+
+@pytest.fixture
+def clean_db(db):
+    """Удаляем все данные, связанные с тестируемыми моделями."""
+    Comment.objects.all().delete()
+    News.objects.all().delete()
 
 
 @pytest.fixture
@@ -32,7 +40,7 @@ def not_author(db):
 
 
 @pytest.fixture
-def auth_client(db, author):
+def author_client(db, author):
     """Фикстура для авторизованного клиента."""
     client = Client()
     client.force_login(author)
@@ -63,7 +71,6 @@ def news(db):
         News(
             title=f'Новость {index}',
             text='Просто текст.',
-            # Для каждой новости уменьшаем дату на index дней от today
             date=today_date - timedelta(days=index)
         ) for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
     ])
@@ -73,12 +80,23 @@ def news(db):
 def news_with_comments(db, news_object, author):
     """Создает новость с комментариями."""
     now = timezone.now()
-    # Создаем комментарии
     for index in range(settings.NEWS_COUNT_ON_HOME_PAGE):
         comment = Comment.objects.create(
             news=news_object, author=author, text=f'Текст {index}',
         )
-        # Устанавливаем время создания комментария
         comment.created = now + timedelta(days=index)
-        # Сохраняем изменения
         comment.save()
+    return news_object
+
+
+@pytest.fixture
+def urls():
+    return {
+        'home': reverse('news:home'),
+        'detail': lambda id: reverse('news:detail', args=[id]),
+        'edit': lambda id: reverse('news:edit', args=[id]),
+        'delete': lambda id: reverse('news:delete', args=[id]),
+        'login': reverse('users:login'),
+        'logout': reverse('users:logout'),
+        'signup': reverse('users:signup'),
+    }

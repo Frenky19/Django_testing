@@ -1,13 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 def today():
     return datetime.today()
-
-
-def yesterday(today):
-    return today - timedelta(days=1)
-
-
-def tomorrow(today):
-    return today + timedelta(days=1)
