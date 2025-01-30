@@ -44,7 +44,8 @@ def test_pages_availability(
 def test_redirect_for_anonymous_client(clean_db, urls, client, comment):
     """Тест редиректа для анонимных пользователей на страницы авторизации."""
     for page in (urls['edit'](comment.id,), urls['delete'](comment.id,)):
-        redirect_url = f'{urls['login']}?next={page}'
+        login_url = urls['login']
+        redirect_url = f'{login_url}?next={page}'
         response = client.get(page)
         assert response.status_code == HTTPStatus.FOUND
         assert response.url == redirect_url

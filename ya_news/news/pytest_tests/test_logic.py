@@ -20,7 +20,8 @@ def test_user_can_create_comment(
     comment_count_after = Comment.objects.count()
     assert comment_count_after == comment_count_before + 1
     assert response.status_code == HTTPStatus.FOUND
-    assert response.url == f'{urls['detail'](news_object.id)}#comments'
+    detail_url = urls['detail'](news_object.id)
+    assert response.url == f'{detail_url}#comments'
     comment = Comment.objects.get()
     assert comment.text == form_data['text']
     assert comment.news == news_object
