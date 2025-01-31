@@ -5,7 +5,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
 
 from news.models import Comment, News
 from .utils import today
@@ -67,18 +66,6 @@ def news(db):
             date=today_date - timedelta(days=index)
         ) for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
     )
-
-
-@pytest.fixture
-def news_with_comments(db, news_object, author):
-    """Создает новость с комментариями."""
-    now = timezone.now()
-    for index in range(settings.NEWS_COUNT_ON_HOME_PAGE):
-        comment = Comment.objects.create(
-            news=news_object, author=author, text=f'Текст {index}',
-        )
-        comment.created = now + timedelta(days=index)
-        comment.save()
 
 
 @pytest.fixture

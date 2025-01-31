@@ -23,9 +23,9 @@ def test_news_order(client, urls, news):
     assert all_dates == sorted_dates
 
 
-def test_comments_order(client, urls, news_with_comments):
+def test_comments_order(client, urls):
     """Проверяет порядок комментариев на странице детали новости (по дате)."""
-    response = client.get(urls['detail'](news_with_comments.id))
+    response = client.get(urls['detail'])
     assert 'news' in response.context
     all_comments = response.context['news'].comment_set.order_by('created')
     all_dates = [comment.created for comment in all_comments]
@@ -33,16 +33,14 @@ def test_comments_order(client, urls, news_with_comments):
     assert all_dates == sorted_dates
 
 
-def test_anonymous_client_has_no_form(client, urls, news_with_comments):
+def test_anonymous_client_has_no_form(client, urls):
     """Анонимный пользователь не видит форму для комментариев."""
-    response = client.get(urls['detail'](news_with_comments.id))
+    response = client.get(urls['detail'])
     assert 'form' not in response.context
 
 
-def test_authorized_client_has_form(
-        not_author_client, urls, news_with_comments
-):
+def test_authorized_client_has_form(not_author_client, urls):
     """Авторизованный пользователь видит форму для комментариев."""
-    response = not_author_client.get(urls['detail'](news_with_comments.id))
+    response = not_author_client.get(urls['detail'])
     assert 'form' in response.context
     assert isinstance(response.context['form'], CommentForm)
