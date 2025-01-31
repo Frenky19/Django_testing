@@ -15,13 +15,6 @@ User = get_user_model()
 
 
 @pytest.fixture
-def clean_db(db):
-    """Удаляем все данные, связанные с тестируемыми моделями."""
-    Comment.objects.all().delete()
-    News.objects.all().delete()
-
-
-@pytest.fixture
 def news_object(db):
     """Фикстура для создания тестовой новости."""
     return News.objects.create(title='Заголовок', text='Текст')
@@ -67,13 +60,13 @@ def comment(news_object, author):
 def news(db):
     """Создает тестовые новости для главной страницы."""
     today_date = today()
-    News.objects.bulk_create([
+    News.objects.bulk_create(
         News(
             title=f'Новость {index}',
             text='Просто текст.',
             date=today_date - timedelta(days=index)
         ) for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    ])
+    )
 
 
 @pytest.fixture
@@ -86,16 +79,15 @@ def news_with_comments(db, news_object, author):
         )
         comment.created = now + timedelta(days=index)
         comment.save()
-    return news_object
 
 
 @pytest.fixture
-def urls():
+def urls(comment):
     return {
         'home': reverse('news:home'),
-        'detail': lambda id: reverse('news:detail', args=[id]),
-        'edit': lambda id: reverse('news:edit', args=[id]),
-        'delete': lambda id: reverse('news:delete', args=[id]),
+        'detail': reverse('news:detail', args=[comment.id]),
+        'edit': reverse('news:edit', args=[comment.id]),
+        'delete': reverse('news:delete', args=[comment.id]),
         'login': reverse('users:login'),
         'logout': reverse('users:logout'),
         'signup': reverse('users:signup'),

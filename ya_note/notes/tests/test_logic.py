@@ -1,57 +1,18 @@
 from http import HTTPStatus
 
-from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
-from django.urls import reverse
 from pytils.translit import slugify
 
 from notes.forms import WARNING
 from notes.models import Note
-
-
-User = get_user_model()
-
-
-class BaseTestCase(TestCase):
-    """Базовый тестовый класс, используемый другими классами"""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = User.objects.create_user(username='Автор')
-        cls.not_author = User.objects.create_user(username='Не автор')
-        cls.note = Note.objects.create(
-            title='Заголовок',
-            text='Текст заметки',
-            slug='note-slug',
-            author=cls.author
-        )
-        cls.form_data = {
-            'title': 'Новый заголовок',
-            'text': 'Новый текст',
-            'slug': 'new-slug'
-        }
-        cls.author_client = Client()
-        cls.author_client.force_login(cls.author)
-        cls.not_author_client = Client()
-        cls.not_author_client.force_login(cls.not_author)
-        cls.notes_url = reverse('notes:list')
-        cls.note_add_url = reverse('notes:add')
-        cls.note_edit_url = reverse('notes:edit', args=(cls.note.slug,))
-        cls.note_delete_url = reverse('notes:delete', args=(cls.note.slug,))
-        cls.success_url = reverse('notes:success')
-        cls.login_url = reverse('users:login')
+from .fixtures import BaseTestCase
 
 
 class LogicTests(BaseTestCase):
-    """Класс, тестирующий логику приложения"""
-
-    def setUp(self):
-        """Очищает все динамически создаваемые данные"""
-        super().setUp()
-        Note.objects.exclude(pk=self.note.pk).delete()
+    """Класс, тестирующий логику приложения."""
 
     def test_user_can_create_note(self):
         """Авторизированный пользователь может создать заметку."""
+        Note.objects.all().delete()
         notes_count_before = Note.objects.count()
         response = self.author_client.post(
             self.note_add_url, data=self.form_data
@@ -59,7 +20,7 @@ class LogicTests(BaseTestCase):
         self.assertRedirects(response, self.success_url)
         notes_count_after = Note.objects.count()
         self.assertEqual(notes_count_after, notes_count_before + 1)
-        new_note = Note.objects.last()
+        new_note = Note.objects.get()
         self.assertEqual(new_note.title, self.form_data['title'])
         self.assertEqual(new_note.text, self.form_data['text'])
         self.assertEqual(new_note.slug, self.form_data['slug'])
@@ -88,13 +49,14 @@ class LogicTests(BaseTestCase):
 
     def test_empty_slug(self):
         """Если slug пустой, он генерируется автоматически."""
+        Note.objects.all().delete()
         notes_count_before = Note.objects.count()
         self.form_data.pop('slug')
         response = self.author_client.post(self.note_add_url, self.form_data)
         notes_count_after = Note.objects.count()
         self.assertRedirects(response, self.success_url)
         self.assertEqual(notes_count_after, notes_count_before + 1)
-        new_note = Note.objects.last()
+        new_note = Note.objects.get()
         expected_slug = slugify(self.form_data['title'])
         self.assertEqual(new_note.slug, expected_slug)
 

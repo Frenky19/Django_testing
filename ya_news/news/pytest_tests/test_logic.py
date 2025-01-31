@@ -12,6 +12,7 @@ pytestmark = pytest.mark.django_db
 def test_user_can_create_comment(
         clean_db, author_client, urls, news_object, author
 ):
+    """Авторизированнный пользователь может создавать комментарии."""
     comment_count_before = Comment.objects.count()
     form_data = {'text': 'Текст комментария'}
     response = author_client.post(
@@ -29,7 +30,7 @@ def test_user_can_create_comment(
 
 
 def test_user_cant_use_bad_words(clean_db, author_client, urls, news_object):
-    """Проверяем, что комментарий не содержит 'плохие слова'"""
+    """Проверяем, что комментарий не содержит 'плохие слова'."""
     comment_count_before = Comment.objects.count()
     bad_words = {'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'}
     response = author_client.post(
@@ -45,6 +46,7 @@ def test_user_cant_use_bad_words(clean_db, author_client, urls, news_object):
 def test_author_can_delete_comment(
         clean_db, author_client, urls, comment
 ):
+    """Автор может удалять свои комментарии."""
     comment_count_before = Comment.objects.count()
     response = author_client.post(urls['delete'](comment.id))
     comment_count_after = Comment.objects.count()
@@ -56,6 +58,7 @@ def test_author_can_delete_comment(
 def test_user_cant_delete_comment_of_another_user(
         clean_db, not_author_client, urls, comment
 ):
+    """Не автор не может удалять чужие комментарии."""
     comment_count_before = Comment.objects.count()
     response = not_author_client.post(urls['delete'](comment.id))
     comment_count_after = Comment.objects.count()
@@ -66,6 +69,7 @@ def test_user_cant_delete_comment_of_another_user(
 def test_author_can_edit_comment(
         clean_db, author_client, urls, comment, client
 ):
+    """Автор может редактировать свои комментарии."""
     new_text = 'Обновлённый комментарий'
     response = author_client.post(
         urls['edit'](comment.id), data={'text': new_text}
@@ -81,6 +85,7 @@ def test_author_can_edit_comment(
 def test_user_cant_edit_comment_of_another_user(
         clean_db, urls, not_author_client, comment
 ):
+    """Не автор не может редактировать чужие комментарии."""
     new_text = 'Обновлённый комментарий'
     response = not_author_client.post(
         urls['edit'](comment.id), data={'text': new_text}
